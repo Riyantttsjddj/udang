@@ -1,0 +1,116 @@
+name: Check and Build Android Project
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Check and create settings.gradle if missing
+      run: |
+        if [ ! -f settings.gradle ]; then
+          echo "settings.gradle not found, creating default..."
+          echo 'rootProject.name = "ShrimpCounterApp"' > settings.gradle
+          echo 'include ":app"' >> settings.gradle
+        else
+          echo "settings.gradle found"
+        fi
+
+    - name: Check and create root build.gradle if missing
+      run: |
+        if [ ! -f build.gradle ]; then
+          echo "build.gradle not found, creating default..."
+          cat <<EOF > build.gradle
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.0'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+EOF
+        else
+          echo "build.gradle found"
+        fi
+
+    - name: Check and create app/build.gradle if missing
+      run: |
+        if [ ! -f app/build.gradle ]; then
+          echo "app/build.gradle not found, creating default..."
+          mkdir -p app
+          cat <<EOF > app/build.gradle
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.shrimpcounterapp'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "com.example.shrimpcounterapp"
+        minSdk 21
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+}
+EOF
+        else
+          echo "app/build.gradle found"
+        fi
+
+    - name: Grant execute permission to gradlew (if exists)
+      run: |
+        if [ -f ./gradlew ]; then
+          chmod +x ./gradlew
+        else
+          echo "gradlew not found, will generate wrapper"
+        fi
+
+    - name: Generate gradle wrapper if gradlew missing
+      if: ${{ !exists('./gradlew') }}
+      run: gradle wrapper
+
+    - name: List Gradle tasks
+      run: ./gradlew tasks
+
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug
+
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ShrimpCounterApp-Debug
+        path: app/build/outputs/apk/debug/app-debug.apk
+        
