@@ -1,0 +1,35 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 🔁 Checkout source code
+      uses: actions/checkout@v4
+
+    - name: ⚙️ Setup JDK 11
+      uses: actions/setup-java@v4
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: 🛠️ Grant execute permission to gradlew
+      run: chmod +x ./gradlew
+
+    - name: 🧱 Build Debug APK
+      run: ./gradlew assembleDebug
+
+    - name: 📦 Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ShrimpCounterApp-Debug
+        path: app/build/outputs/apk/debug/app-debug.apk
+        
