@@ -1,0 +1,147 @@
+name: Check and Build Android Project
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 🔁 Checkout repo
+      uses: actions/checkout@v4
+
+    - name: 🧪 Ensure Android project structure
+      run: |
+        mkdir -p app/src/main/java/com/example/shrimpcounterapp
+        mkdir -p app/src/main/res/layout
+        mkdir -p app/src/main/res/values
+        mkdir -p app/src/main/assets
+
+        # Buat settings.gradle jika belum ada
+        if [ ! -f settings.gradle ]; then
+          echo "rootProject.name = 'ShrimpCounterApp'" > settings.gradle
+          echo "include ':app'" >> settings.gradle
+        fi
+
+        # Buat root build.gradle jika belum ada
+        if [ ! -f build.gradle ]; then
+          cat <<EOF > build.gradle
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.0'
+    }
+}
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+EOF
+        fi
+
+        # Buat app/build.gradle jika belum ada
+        if [ ! -f app/build.gradle ]; then
+          cat <<EOF > app/build.gradle
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.shrimpcounterapp'
+    compileSdk = 33
+
+    defaultConfig {
+        applicationId "com.example.shrimpcounterapp"
+        minSdk = 21
+        targetSdk = 33
+        versionCode = 1
+        versionName = "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+}
+EOF
+        fi
+
+        # Buat AndroidManifest.xml kalau belum ada
+        if [ ! -f app/src/main/AndroidManifest.xml ]; then
+          cat <<EOF > app/src/main/AndroidManifest.xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.shrimpcounterapp">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="ShrimpCounterApp"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        <activity android:name=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+EOF
+        fi
+
+        # Buat MainActivity.java dummy jika belum ada
+        if [ ! -f app/src/main/java/com/example/shrimpcounterapp/MainActivity.java ]; then
+          cat <<EOF > app/src/main/java/com/example/shrimpcounterapp/MainActivity.java
+package com.example.shrimpcounterapp;
+
+import android.os.Bundle;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MainActivity extends AppCompatActivity {
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+  }
+}
+EOF
+        fi
+
+    - name: ⚙️ Setup JDK 11
+      uses: actions/setup-java@v4
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: 🔨 Generate gradle wrapper if needed
+      run: |
+        if [ ! -f ./gradlew ]; then
+          gradle wrapper
+        fi
+        chmod +x ./gradlew
+
+    - name: 🧱 Build Debug APK
+      run: ./gradlew assembleDebug
+
+    - name: 📦 Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ShrimpCounterApp-Debug
+        path: app/build/outputs/apk/debug/app-debug.apk
+        
